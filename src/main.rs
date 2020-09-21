@@ -3,6 +3,7 @@
 use structopt::StructOpt;
 use term_table::table_cell::TableCell;
 use term_table::row::Row;
+use indicatif::ProgressBar;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "Has scraper")]
@@ -71,35 +72,48 @@ fn guided(){
 	let year = has::CLI_question("Choose a year",has::get_years());
 	let age:String;
 	let category:String;
-	let mut data:Vec<Vec<Vec<String>>> = vec!(vec!(vec!("".to_string())));
 	let ans = has::CLI_question("Do you want to see all ages", vec!("yes".to_string(),"no".to_string()));
+	let mut data:Vec<Vec<Vec<String>>> = vec!(vec!(vec!("".to_string())));
 	if ans == "yes"{
-
+		let bar = ProgressBar::new(has::get_ages(year.clone()).len() as u64);
+		for x in has::get_ages(year.clone()){
+			data.append(&mut has::format_data(has::get_data("https://www.has.hr/images/stories/HAS/tabsez/".to_owned() + &year.clone() + "/" + &x.clone()),format!("{} {}",x.clone(),year.clone())));
+			bar.inc(1);
+		}
+		bar.finish();
 	}else{
-		age = has::CLI_question("Choose a age",has::get_ages(year.clone()));
-		data = has::format_data(has::get_data("https://www.has.hr/images/stories/HAS/tabsez/".to_owned()+&year.clone()+"/"+&age.clone()));
-	}
-	let ans = has::CLI_question("Do you want to see all categories", vec!("yes".to_string(),"no".to_string()));
-	if ans == "no"{
-		category = has::CLI_question("Choose a category", has::get_categories(data.clone()));
-		data = has::get_category(data.clone(), category);
-	}
-	let ans = has::CLI_question("Do you want filter the results", vec!("yes".to_string(),"no".to_string()));
-	if ans == "yes"{
-		let ans = has::CLI_question("How do you want to filter the results", vec!("exact".to_string(),"partial".to_string()));
-		let key = has::CLI_input("What do you want to search for");
-		if ans == "exact"{
-			data = has::search(data,key,true);
-		}else{
-			data = has::search(data,key,false);
+		let mut alias:Vec<Vec<String>> = vec![];
+		for x in has::get_ages(year.clone()){
+			alias.push(has::get_age_alias(x, year.clone()));
+		}
+		age = has::CLI_question_alias("Choose a age",has::get_ages(year.clone()), alias);
+		data = has::format_data(has::get_data("https://www.has.hr/images/stories/HAS/tabsez/".to_owned()+&year.clone()+"/"+&age.clone()), "".parse().unwrap());
+		let ans = has::CLI_question("Do you want to see all categories", vec!("yes".to_string(),"no".to_string()));
+		if ans == "no"{
+			let mut alias:Vec<Vec<String>> = vec![];
+			for x in has::get_categories(data.clone()){
+				alias.push(has::get_category_alias(x));
+			}
+			category = has::CLI_question_alias("Choose a category", has::get_categories(data.clone()),alias);
+			data = has::get_category(data.clone(), category);
+		}
+		let ans = has::CLI_question("Do you want filter the results", vec!("yes".to_string(),"no".to_string()));
+		if ans == "yes"{
+			let ans = has::CLI_question("How do you want to filter the results", vec!("exact".to_string(),"partial".to_string()));
+			let key = has::CLI_input("What do you want to search for");
+			if ans == "exact"{
+				data = has::search(data,key,true);
+			}else{
+				data = has::search(data,key,false);
+			}
 		}
 	}
+
 	let ans = has::CLI_question("Do you want to save the result", vec!("yes".to_string(),"no".to_string()));
 
 	if ans == "yes"{
 		has::save(data);
 	}else{
-
 		for x in 0..data.len(){
 			let mut table = term_table::Table::new();
 			table.max_column_width = 40;

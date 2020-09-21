@@ -39,26 +39,116 @@ pub fn get_ages(year:String) -> Vec<String>{
         let txt = y.text().collect::<Vec<_>>();
         if txt[0].find(".html").unwrap_or(99) != 99 || txt[0].find(".htm").unwrap_or(99) != 99 {
             ages.push(txt[0].to_string());
-                /*.replace(".html", "")
-                .replace("ddm", "Kadeti")
-                .replace("ddw", "Kadetkinje")
-                .replace("ddm", "Kadeti")
-                .replace("jjm", "Juniori")
-                .replace("jjw", "Juniorke")
-                .replace("mdm", "Mlađi kadeti")
-                .replace("mdw", "Mlađe kadetkinje")
-                .replace("mjm", "Mlađi juniori")
-                .replace("mjw", "Mlađe juniorke")
-                .replace("msm", "Mlađi seniori")
-                .replace("msw", "Mlađe seniorke")
-                .replace("ssm", "Seniori")
-                .replace("ssw", "Seniorke")
-                .replace(&year[2..4], "&")
-                .replace("&d", " dvorana")
-                .replace("&", ""));*/
         }
     }
     ages
+}
+pub fn get_age_alias(age:String, year:String) -> Vec<String>{
+    let mut res:Vec<String> = Vec::new();
+    res.push(age.replace(".html", "")
+        .replace(".htm", "")
+        .replace("ddw", "Kadetkinje")
+        .replace("ddm", "Kadeti")
+        .replace("jjm", "Juniori")
+        .replace("jjw", "Juniorke")
+        .replace("mdm", "Mlađi kadeti")
+        .replace("mdw", "Mlađe kadetkinje")
+        .replace("mjm", "Mlađi juniori")
+        .replace("mjw", "Mlađe juniorke")
+        .replace("msm", "Mlađi seniori")
+        .replace("msw", "Mlađe seniorke")
+        .replace("ssm", "Seniori")
+        .replace("ssw", "Seniorke")
+        .replace(&year[2..4], "&")
+        .replace("&d", " dvorana")
+        .replace("&", ""));
+    res.push(age.replace(".html", "")
+        .replace(".htm", "")
+        .replace("ddw", "kw")
+        .replace("ddm", "km")
+        .replace("jjm", "jm")
+        .replace("jjw", "jw")
+        .replace("mdm", "mkm")
+        .replace("mdw", "mkw")
+        .replace("mjm", "mjm")
+        .replace("mjw", "mjw")
+        .replace("msm", "msm")
+        .replace("msw", "msw")
+        .replace("ssm", "sm")
+        .replace("ssw", "sw")
+        .replace(&year[2..4], "&")
+        .replace("&d", "d")
+        .replace("&", ""));
+    res.push(age.replace(".html", "")
+        .replace(".htm","")
+        .replace(&year[2..4], "&")
+        .replace("&d", "d")
+        .replace("&", "")
+        .replace("ddw", "U16w")
+        .replace("ddm", "U16m")
+        .replace("jjm", "U20m")
+        .replace("jjw", "U20w")
+        .replace("mdm", "U14m")
+        .replace("mdw", "U14w")
+        .replace("mjm", "U18m")
+        .replace("mjw", "U18w")
+        .replace("msm", "U23m")
+        .replace("msw", "U23w")
+        .replace("ssm", "M35")
+        .replace("ssw", "W35"));
+    res
+}
+pub fn get_category_alias(category:String) -> Vec<String>{
+    let mut res:Vec<String> = Vec::new();
+    let split = category.split("/ ").collect::<Vec<&str>>();
+    for x in 0..split.len(){
+        res.push(split[x].trim().parse().unwrap());
+    }
+    let cro:String = split[0].trim().parse().unwrap();
+    if split.len() > 1 {
+        let mut eng:String = split[1].trim().parse().unwrap();
+        let start = eng.find("(").unwrap_or(99);
+        let end = eng.find(")").unwrap_or(99);
+        if start != 99 && end != 99 {
+            let info = &eng[start+1..end];
+            eng = String::from(&eng[0..start]);
+        }
+        eng = eng.trim().parse().unwrap();
+        let split = eng.split(" ").collect::<Vec<&str>>();
+        if split.len() > 1 {
+            let mut word = String::new();
+            for x in 0..split.len() {
+                if split[x] != "km" && split[x] != "m" && !split[x].chars().all(char::is_numeric) {
+                    word.push_str(&split[x][0..1]);
+                }
+            }
+            if word == "RRW"{
+                word = "RW".parse().unwrap();
+            }
+            if !word.is_empty(){
+                if split.len() > 2 {
+                    let mut cat = String::new();
+                    cat.push_str(split[0]);
+                    if split[1] != "Race" {
+                        cat.push_str(split[1]);
+                    }else{
+                        cat.push_str("m");
+                    }
+                    if word != "S" {
+                        cat.push_str(&word);
+                    }else{
+                        cat.push_str("SC");
+                    }
+                    res.push(cat);
+                }else{
+                    res.push(word);
+                }
+            }else{
+                res.push(eng);
+            }
+        }
+    }
+    res
 }
 pub fn get_categories(data:Vec<Vec<Vec<String>>>) -> Vec<String>{
     let mut cat = Vec::new();
@@ -94,44 +184,48 @@ pub fn CLI_question(question:&str, answers:Vec<String>) -> String{
             .read_line(&mut ans)
             .expect("Failed to read line");
 
-        let ans:String = ans.split_whitespace().collect();
+        let ans:String = ans.to_lowercase().split_whitespace().collect();
         for x in 0..answers.len(){
-            let comp:String = answers[x].split_whitespace().collect();
+            let comp:String = answers[x].to_lowercase().split_whitespace().collect();
             if ans == comp{
+                let ans = answers[x].split_whitespace().collect();
                 return ans;
             }
         }
         println!("Invaild answer");
     }
 }
-pub fn CLI_question_alias(question:&str, answers:Vec<String>, alias:Vec<String>) -> String{
+pub fn CLI_question_alias(question:&str, answers:Vec<String>, alias:Vec<Vec<String>>) -> String{
     let mut ans= "".to_string();
-    let mut mode = 0;
     println!("{}", question);
-    if answers.len() == 2{
-        println!("{} or {}",answers[0],answers[1]);
-        mode = 0;
-    }else{
-        for x in 0..answers.len(){
-            println!("{} -> {}",x,answers[x]);
+    for x in 0..alias.len() {
+        let mut pat = String::new();
+        for y in 0..alias[x].len()-1{
+            pat.push_str(&*format!("{} or ", alias[x][y]));
         }
-        mode = 1;
+        pat.push_str(&*format!("{}", alias[x][alias[x].len()-1]));
+        println!("{}", pat);
     }
+    let mut res;
     'main:loop{
+        let mut ans= "".to_string();
         io::stdin()
             .read_line(&mut ans)
             .expect("Failed to read line");
 
-        let mut ans:String = ans.split_whitespace().collect();
-        for x in 0..answers.len(){
-            if ans == answers[x]{
-                ans = alias[x].clone();
-                break 'main;
+        let mut ans:String = ans.to_lowercase().split_whitespace().collect();
+        for x in 0..alias.len(){
+            for y in 0..alias[x].len() {
+                let comp:String = alias[x][y].to_lowercase().split_whitespace().collect();
+                if ans == comp {
+                    res = x;
+                    break 'main;
+                }
             }
         }
         println!("Invaild answer");
     }
-    ans
+    answers[res].clone()
 }
 pub fn get_category(data:Vec<Vec<Vec<String>>>, category:String) -> Vec<Vec<Vec<String>>> {
     let mut cat = Vec::new();
@@ -228,26 +322,25 @@ pub fn get_data(url:String) -> Vec<String>{
     }
     info.iter().map(|s| s.to_string()).collect()
 }
-pub fn format_data(info:Vec<String>) -> Vec<Vec<Vec<String>>> {
+pub fn format_data(info:Vec<String>, age:String) -> Vec<Vec<Vec<String>>> {
     let mut cur = 0;
     let mut name = 0;
     let mut vals:Vec<String> = Vec::new();
     let mut table = Vec::new();
     let mut data_array = Vec::new();
+    let mut first = true;
     loop{
         if info[cur] == "Start" {
             table.push(vals.clone());
             data_array.push(table.clone());
             table.clear();
             vals.clear();
+            first = true;
         } else if info[cur] == "New"{
             table.push(vals.clone());
             vals.clear();
         } else{
-            let valb = info[cur].find("(").unwrap_or(99);
-            let valrb = info[cur].find(")").unwrap_or(99);
-            let valc = info[cur].find("(cesta)").unwrap_or(99);
-            if (valb == 99 && valrb == 99) || valc != 99{
+            if (info[cur].find("(").unwrap_or(99) == 99 && info[cur].find(")").unwrap_or(99) == 99) || first == true{
                 if !(info[cur] == "Name" || info[cur] == "Club" || info[cur] == "Wind")  && name == 0{
                     vals.push((&info[cur]).to_string());
                 }else if info[cur] == "End"{
@@ -286,6 +379,7 @@ pub fn format_data(info:Vec<String>) -> Vec<Vec<Vec<String>>> {
                 }else{
                     name += 1;
                 }
+                first = false;
             }
         }
         cur += 1;
@@ -405,6 +499,9 @@ pub fn search(mut data:Vec<Vec<Vec<String>>>, key:String, exact:bool) -> Vec<Vec
             data.remove(y - removed);
             removed += 1;
         }
+    }
+    if data[0][0].len() == 1{
+        data.remove(0);
     }
     data
 }

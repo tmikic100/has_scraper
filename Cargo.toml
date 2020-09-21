@@ -12,3 +12,4 @@ tokio = { version = "0.2", features = ["full"] }
 scraper = "0.12.0"
 structopt = "0.3"
 term-table = "1.3.0"
+indicatif = "0.15.0"
