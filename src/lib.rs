@@ -163,8 +163,7 @@ pub fn CLI_input(question:&str) -> String {
     io::stdin()
         .read_line(&mut ans)
         .expect("Failed to read line");
-
-    let ans:String = ans.split_whitespace().collect();
+    let ans = ans.replace("\n","");
     ans
 }
 pub fn CLI_question(question:&str, answers:Vec<String>) -> String{
@@ -178,7 +177,7 @@ pub fn CLI_question(question:&str, answers:Vec<String>) -> String{
         }
     }
     let mut response = "".to_string();
-    'main:loop{
+    loop{
         let mut ans = "".to_string();
         io::stdin()
             .read_line(&mut ans)
@@ -278,22 +277,36 @@ pub fn get_data(url:String) -> Vec<String>{
         }
     }
     let mut info = Vec::new();
-
     let mut index = 0;
+    let mut relay = false;
+    let mut national = (false, false);
     for result in &results {
+        let mut cur = 0;
         info.push("Start");
         info.push(catagories[index]);
-        let mut row = 0;
+        if catagories[index].find("x").unwrap_or(99) == 99 && catagories[index].find("Medlay").unwrap_or(99) == 99{
+            relay = false;
+        }else{
+            relay = true;
+        }
+
+        let mut found = (false, false);
         for time in result.split("\n"){
-            info.push("New");
-            let mut found = (false, false);
-            let mut once = false;
+            if cur%2 == 0 && relay == true{
+                info.push("New");
+                found = (false, false)
+            }else if relay == false{
+                info.push("New");
+                found = (false, false)
+            }
             for detail in time.split(" "){
                 if detail != ""{
-                    if catagories[index].find("x").unwrap_or(99) == 99{
+                    if relay == false {
                         if !detail.chars().all(char::is_alphabetic) && (found == (true,false) || found == (true,true)) && detail != "/"{
-                            info.push("End");
-                            found = (false, true);
+                            if detail.find(",").unwrap_or(99) == 99 {
+                                info.push("End");
+                                found = (false, true);
+                            }
                         }
                         if detail.len() > 1{
                             if detail == "uz" || detail == "nema"{
@@ -304,19 +317,47 @@ pub fn get_data(url:String) -> Vec<String>{
                                     info.push("Name");
                                     found = (true,false);
                                 }else if found == (false,true){
-                                    info.push("Club");
+                                    info.push("City");
                                     found = (true, true);
                                 }
                             }
                         }
+                    }else{
+                        if detail.find(".").unwrap_or(99) != 99 && found == (true, false){
+                            info.push("End");
+                            found = (false, true);
+                        }
+                        if detail.to_uppercase() != detail && found == (true, false) && national == (false, false) {
+                            info.push("End");
+                            found = (false, false);
+                        }
+                        if found == (true, true) && detail.find(")").unwrap_or(99) != 99{
+                            info.push("End");
+                            found = (false, true);
+                        }
+                        if national == (false, true) && (detail != "Mlađi" || detail != "Mlađe"){
+                            national = (false, false);
+                        }
+                        if detail == "-" && national == (false, false) {
+                            national = (false, true);
+                        }
+                        if detail.chars().any(char::is_alphabetic) && found == (false, false){
+                            info.push("Club");
+                            found = (true, false);
+                        }
+                        if found == (false, true) && detail.chars().any(char::is_alphabetic){
+                            info.push("Relay");
+                            found = (true, true);
+                        }
+
                     }
                     info.push(detail);
                     if detail == "assisted" || detail == "information"{
                         info.push("End");
                     }
-
                 }
             }
+            cur += 1;
         }
         index += 1;
     }
@@ -329,6 +370,7 @@ pub fn format_data(info:Vec<String>, age:String) -> Vec<Vec<Vec<String>>> {
     let mut table = Vec::new();
     let mut data_array = Vec::new();
     let mut first = true;
+    let mut relay = false;
     loop{
         if info[cur] == "Start" {
             table.push(vals.clone());
@@ -340,11 +382,14 @@ pub fn format_data(info:Vec<String>, age:String) -> Vec<Vec<Vec<String>>> {
             table.push(vals.clone());
             vals.clear();
         } else{
-            if (info[cur].find("(").unwrap_or(99) == 99 && info[cur].find(")").unwrap_or(99) == 99) || first == true{
-                if !(info[cur] == "Name" || info[cur] == "Club" || info[cur] == "Wind")  && name == 0{
+            if info[cur] == "Relay"{
+                relay = true;
+            }
+            if (info[cur].find("(").unwrap_or(99) == 99 && info[cur].find(")").unwrap_or(99) == 99) || first == true || relay == true{
+                if !(info[cur] == "Name" || info[cur] == "City" || info[cur] == "Wind" || info[cur] == "Club" || info[cur] == "Relay")  && name == 0{
                     vals.push((&info[cur]).to_string());
                 }else if info[cur] == "End"{
-                    if name == 2{
+                    if name <= 2{
                         vals.push((&info[cur-1]).to_string());
                     }else{
                         let mut string = String::new();
@@ -354,12 +399,16 @@ pub fn format_data(info:Vec<String>, age:String) -> Vec<Vec<Vec<String>>> {
                         }
                         string += info[cur - 1].as_str();
                         let mut temp = Vec::new();
-                        if info[cur-name] == "Name" || info[cur-name] == "Club" {
+                        if info[cur-name] == "Name" || info[cur-name] == "City" || info[cur-name] == "Club" || info[cur-name] == "Relay"{
                             for el in string.split(" "){
                                 temp.push(el);
                             }
-                            vals.push(temp[0].to_string());
-                            temp.remove(0);
+                            if info[cur-name] != "Club" {
+                                if info[cur-name] != "Relay" {
+                                    vals.push(temp[0].to_string());
+                                    temp.remove(0);
+                                }
+                            }
                             let mut string = String::new();
                             if temp.len() != 1{
                                 for x in 0..temp.len()-1{
@@ -370,6 +419,9 @@ pub fn format_data(info:Vec<String>, age:String) -> Vec<Vec<Vec<String>>> {
                                 vals.push(string);
                             }else{
                                 vals.push(temp[temp.len()-1].to_string());
+                            }
+                            if relay == true{
+                                relay = false;
                             }
                         }else if info[cur-name] == "Wind"{
                             vals.push(string);
@@ -432,23 +484,65 @@ pub fn format_data(info:Vec<String>, age:String) -> Vec<Vec<Vec<String>>> {
             }
         }
     }
+    if age != ""{
+        let age = age.split(" ").collect::<Vec<&str>>();
+        for x in 0..data_array.len(){
+            if data_array[x].len() != 0 {
+                data_array[x][0][0] = format!("{} {}", data_array[x][0][0], age[0].replace(".html", "")
+                    .replace(".htm", "")
+                    .replace(&age[1][2..4], "&")
+                    .replace("&d", "d")
+                    .replace("&", "")
+                    .replace("ddw", "U16w")
+                    .replace("ddm", "U16m")
+                    .replace("jjm", "U20m")
+                    .replace("jjw", "U20w")
+                    .replace("mdm", "U14m")
+                    .replace("mdw", "U14w")
+                    .replace("mjm", "U18m")
+                    .replace("mjw", "U18w")
+                    .replace("msm", "U23m")
+                    .replace("msw", "U23w")
+                    .replace("ssm", "M35")
+                    .replace("ssw", "W35"));
+            }
+        }
+    }
+    //let relayInfo = vec!("Rank".parse().unwrap(),"Result".parse().unwrap(),"Club".parse().unwrap(),"City".parse().unwrap(),"Date".parse().unwrap(),"First Runner".parse().unwrap(),"Second runner".parse().unwrap(),"Third runner".parse().unwrap(),"Fourth runner".parse().unwrap());
+    //let normalInfo = vec!("Rank".parse().unwrap(),"Result".parse().unwrap(),"Name".parse().unwrap(),"Surname".parse().unwrap(),"Birthday".parse().unwrap(),"Club".parse().unwrap(),"City".parse().unwrap(),"Date".parse().unwrap());
+    //let windInfo = vec!("Rank".parse().unwrap(),"Result".parse().unwrap(),"Wind".parse().unwrap(),"Name".parse().unwrap(),"Surname".parse().unwrap(),"Birthday".parse().unwrap(),"Club".parse().unwrap(),"City".parse().unwrap(),"Date".parse().unwrap());
     data_array
 }
 pub fn search(mut data:Vec<Vec<Vec<String>>>, key:String, exact:bool) -> Vec<Vec<Vec<String>>>{
     let mut matches = Vec::new();
+    let split = key.split(" ").collect::<Vec<&str>>();
+
+    println!("{:?} {}",split, split.len());
     let key:String = key.split_whitespace().collect();
     for x in 0..data.len(){
         for y in 0..data[x].len(){
+            let mut found = Vec::new();
             for z in 0..data[x][y].len(){
                 if exact == false{
-                    if data[x][y][z].to_lowercase().find(&key.to_lowercase()).unwrap_or(99) != 99{
-                        matches.push((x,y));
+                    if data[x][y][z].to_lowercase().find(&key.to_lowercase()).unwrap_or(99) != 99 {
+                        matches.push((x, y));
                     }
                 }else{
-                    if data[x][y][z].to_lowercase() == key.to_lowercase(){
-                        matches.push((x,y));
+                    if split.len() == 1 {
+                        if data[x][y][z].to_lowercase() == key.to_lowercase() {
+                            matches.push((x, y));
+                        }
+                    }else{
+                        for k in 0..split.len(){
+                            if data[x][y][z].to_lowercase() == split[k].to_lowercase() {
+                                found.push(true);
+                            }
+                        }
                     }
                 }
+            }
+            if found.len() == split.len(){
+                matches.push((x, y));
             }
         }
     }
@@ -508,23 +602,22 @@ pub fn search(mut data:Vec<Vec<Vec<String>>>, key:String, exact:bool) -> Vec<Vec
 pub fn save(data_array:Vec<Vec<Vec<String>>>){
     let mut data:String = String::new();
     for x in 0..data_array.len(){
-        for y in 0..data_array[x].len(){
-            if data_array[x][y][0].find("x").unwrap_or(99) == 99 && y == 1{
-                if data_array[x][y].len() == 8{
-                    data += "Result~Wind~Name~Surname~Birthday~Club~City~Date\n";
-                }else if data_array[x][y].len() == 7{
-                    data += "Result~Name~Surname~Birthday~Club~City~Date\n";
-                }
+        data += &(data_array[x][0][0].to_string() + "\n");
+        if data_array[x][0][0].find("x").unwrap_or(99) == 99 && data_array[x][0][0].find("Relay").unwrap_or(99) == 99 {
+            if data_array[x][1].len() == 9{
+                data += "Rank~Result~Wind~Name~Surname~Birthday~Club~City~Date\n";
+            }else if data_array[x][1].len() == 8{
+                data += "Rank~Result~Name~Surname~Birthday~Club~City~Date\n";
             }
-            if data_array[x][y].len() != 1 {
-                for z in 0..data_array[x][y].len()-1{
-                    data += &(data_array[x][y][z].to_string() +"~");
-                }
-                data += &(data_array[x][y][data_array[x][y].len()-1].to_string()+"\n");
-            }else{
-                data += &(data_array[x][y][0].to_string()+"\n");
+        }else{
+            data += "Rank~Result~Team~City~Date~1st runner~2nd runner~3rd runner~4th runner\n";
+        }
+        for y in 1..data_array[x].len(){
+            for z in 0..data_array[x][y].len()-1{
+                data += &(data_array[x][y][z].to_string() +"~");
             }
+            data += &(data_array[x][y][data_array[x][y].len()-1].to_string()+"\n");
         }
     }
-    fs::write("", data).expect("Unable to write file");
+    fs::write("test.csv", data).expect("Unable to write file");
 }
